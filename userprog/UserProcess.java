@@ -497,11 +497,11 @@ public class UserProcess {
         if(Descriptor< 0 || Descriptor >= files.length) {
             return -1;
         }
-        String write = readVirtualMemory(virtualAddress, bte, 0 , count);
+        int write = readVirtualMemory(virtualAddress, bte, 0 , count);
         if(write == -1) {
             return -1;
         }
-        String content = files[Descriptor].write(bte, 0, count);
+        int content = files[Descriptor].write(bte, 0, count);
         if (content == -1 || content < count) {
 			return -1;
 		}
@@ -537,7 +537,7 @@ public class UserProcess {
         if(check == -1){
 			return 0;
 		}
-		ThreadedKernel.fileSystem.remove(name);
+		ThreadedKernel.fileSystem.remove(fileName);
 		handleClose(check);
 		return 0;
     }
