@@ -36,10 +36,8 @@ public class UserProcess {
         for (int i=0; i<numPhysPages; i++){
           pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
         }
-        pageTable[0] = UserKernel.console.openForReading();
-        pageTable[1] = UserKernel.console.openForWriting();
-	files[0] = 1;
-	files[1] = 1;
+        files[0] = UserKernel.console.openForReading();
+        files[1] = UserKernel.console.openForWriting();
         for(int i = 2; i<files.length; i++){
             files[i] = null;
         }
@@ -441,7 +439,7 @@ public class UserProcess {
         for(int i=2; i<files.length; i++){
             if(files[i] == null){ //look for empty file space
                 files[i] = fileContent;
-                return 1;
+                return i;
             }
         }
         return -1;
@@ -490,7 +488,7 @@ public class UserProcess {
             return -1;
         }
         int content = files[Descriptor].write(bte, 0, count);
-        if (content != count) {
+        if (content == -1 || content < count) {
 			return -1;
 	}
         return content;
@@ -518,18 +516,17 @@ public class UserProcess {
 		return -1;   
 	   }
 	    
-		int check = -1;
+
 		for(int i=2; i<files.length; i++){
-            if(files[i] == file){
-	            check = i;
+			OpenFile temp = fileTable[i];
+            if(file != null && fileName == temp.getName()){
+	            files[i] = null;
             }
 		}
-        if(check == -1){
-			return -1;
+		if(ThreadedKernel.fileSystem.remove(fileName)){
+			return 0;
 		}
-		ThreadedKernel.fileSystem.remove(fileName);
-		handleClose(check);
-		return 1;
+		return -1;
     }
 
     /**
