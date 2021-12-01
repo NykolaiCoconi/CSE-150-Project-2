@@ -511,14 +511,14 @@ public class UserProcess {
 		if(fileName == null){ //Check that what you have isn’t empty		
             return -1;
 		}
-	  OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
+	  OpenFile file = ThreadedKernel.fileSystem.open(fileName, false);
 	   if(file == null){
 		return -1;   
 	   }
 	    
 
 		for(int i=2; i<files.length; i++){
-			OpenFile temp = fileso[i];
+			OpenFile temp = files[i];
             if(file != null && fileName == temp.getName()){
 	            files[i] = null;
             }
