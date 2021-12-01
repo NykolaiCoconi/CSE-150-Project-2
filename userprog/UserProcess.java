@@ -495,7 +495,7 @@ public class UserProcess {
     }
 
     private int handleClose(int Descriptor){
-        if(Descriptor < 0 || Descriptor >= files.length || files[Descriptor] == null || count < 0 ){
+        if(Descriptor < 0 || Descriptor >= files.length || files[Descriptor] == null){
 	        return -1;
         }
 		files[Descriptor].close();
@@ -518,7 +518,7 @@ public class UserProcess {
 	    
 
 		for(int i=2; i<files.length; i++){
-			OpenFile temp = fileTable[i];
+			OpenFile temp = fileso[i];
             if(file != null && fileName == temp.getName()){
 	            files[i] = null;
             }
