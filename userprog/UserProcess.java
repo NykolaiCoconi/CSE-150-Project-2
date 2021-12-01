@@ -33,11 +33,13 @@ public class UserProcess {
     public UserProcess() {
         int numPhysPages = Machine.processor().getNumPhysPages();
         pageTable = new TranslationEntry[numPhysPages];
-        //for (int i=0; i<numPhysPages; i++){
-        //  pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
-        //}
-        files[0] = UserKernel.console.openForReading();
-        files[1] = UserKernel.console.openForWriting();
+        for (int i=0; i<numPhysPages; i++){
+          pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+        }
+        pageTable[0] = UserKernel.console.openForReading();
+        pageTable[1] = UserKernel.console.openForWriting();
+	files[0] = 1;
+	files[1] = 1;
         for(int i = 2; i<files.length; i++){
             files[i] = null;
         }
@@ -439,7 +441,7 @@ public class UserProcess {
         for(int i=2; i<files.length; i++){
             if(files[i] == null){ //look for empty file space
                 files[i] = fileContent;
-                return i;
+                return 1;
             }
         }
         return -1;
@@ -467,54 +469,37 @@ public class UserProcess {
     }
 
     private int handleRead(int Descriptor, int buffer, int count){
-        if(Descriptor < 0 || Descriptor >= files.length){
+        if(Descriptor < 0 || Descriptor >= files.length || files[Descriptor] == null || count < 0 ){
 	        return -1;
         }
-		if(files[Descriptor] == null){
-			return -1;
-		}
         byte [] bte = new byte[count]; //create byte array of count length
-        int length = 0;
-        if(files[Descriptor]==null){//check if file exists
+        int length = files[Descriptor].read(bte,0,count);
+        if(length == -1){ //An error occurred while reading file
             return -1;
         }
-        length = files[Descriptor].read(bte,0,count);
-        if(length == -1){ //An error occurred while                                                     /                            //reading file
-            return -1;
-        }
-        writeVirtualMemory(buffer,bte);
-        return length;
+	return writeVirtualMemory(buffer, bte, 0, length);
     }
 
     private int handleWrite(int Descriptor, int virtualAddress, int count){
-        if(Descriptor < 0 || Descriptor >= files.length){
+        if(Descriptor < 0 || Descriptor >= files.length || files[Descriptor] == null || count < 0 ){
 	        return -1;
         }
-		if(files[Descriptor] == null){
-			return -1;
-		}
         byte[] bte = new byte[count];
-        if(Descriptor< 0 || Descriptor >= files.length) {
-            return -1;
-        }
         int write = readVirtualMemory(virtualAddress, bte, 0 , count);
         if(write == -1) {
             return -1;
         }
         int content = files[Descriptor].write(bte, 0, count);
-        if (content == -1 || content < count) {
+        if (content != count) {
 			return -1;
-		}
+	}
         return content;
     }
 
     private int handleClose(int Descriptor){
-        if(Descriptor < 0 || Descriptor >= files.length){
+        if(Descriptor < 0 || Descriptor >= files.length || files[Descriptor] == null || count < 0 ){
 	        return -1;
         }
-		if(files[Descriptor] == null){
-			return -1;
-		}
 		files[Descriptor].close();
 		files[Descriptor] = null;
 		return 0;
@@ -528,18 +513,23 @@ public class UserProcess {
 		if(fileName == null){ //Check that what you have isn’t empty		
             return -1;
 		}
+	  OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
+	   if(file == null){
+		return -1;   
+	   }
+	    
 		int check = -1;
 		for(int i=2; i<files.length; i++){
-            if(files[i]!= null && files[i].getName().equals(name)){
+            if(files[i] == file){
 	            check = i;
             }
 		}
         if(check == -1){
-			return 0;
+			return -1;
 		}
 		ThreadedKernel.fileSystem.remove(fileName);
 		handleClose(check);
-		return 0;
+		return 1;
     }
 
     /**
