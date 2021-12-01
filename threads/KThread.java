@@ -185,12 +185,19 @@ public class KThread {
 	Lib.debug(dbgThread, "Finishing thread: " + currentThread.toString());
 	
 	Machine.interrupt().disable();
-
+		
+	//Added Code
+	KThread thread = currentThread.waitQ.nextThread();
+	while(thread != null) {
+		thread.ready();
+		thread = currentThread.waitQ.nextThread();
+	}
+	//End Added Code
+	        
 	Machine.autoGrader().finishingCurrentThread();
 
 	Lib.assertTrue(toBeDestroyed == null);
 	toBeDestroyed = currentThread;
-
 
 	currentThread.status = statusFinished;
 	
@@ -276,6 +283,18 @@ public class KThread {
 	Lib.debug(dbgThread, "Joining to thread: " + toString());
 
 	Lib.assertTrue(this != currentThread);
+	
+	//Added Code
+	boolean intStatus = Machine.interrupt().disable();
+	if(this.status != statusFinished){  //Check status
+		waitQ.waitForAccess(currentThread);     //Wait
+		currentThread.sleep();		//Put thread to sleep
+	}
+	else {
+			return;
+	}
+	Machine.interrupt().restore(intStatus);
+	//End Added Code
 
     }
 
@@ -432,6 +451,10 @@ public class KThread {
     private Runnable target;
     private TCB tcb;
 
+    //Added Code
+    public ThreadQueue waitQ = ThreadedKernel.scheduler.newThreadQueue(true);
+    //End Added Code
+	
     /**
      * Unique identifer for this thread. Used to deterministically compare
      * threads.
