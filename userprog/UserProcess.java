@@ -4,6 +4,8 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+import java.util.Arrays;
+
 import java.io.EOFException;
 
 /**
@@ -22,11 +24,23 @@ public class UserProcess {
     /**
      * Allocate a new process.
      */
+
+	static int maxlength = 256; //max length of address
+	static int numFiles = 16; //Number of files they want ran
+	protected OpenFile[] files = new OpenFile[numFiles];
+
+
     public UserProcess() {
-	int numPhysPages = Machine.processor().getNumPhysPages();
-	pageTable = new TranslationEntry[numPhysPages];
-	for (int i=0; i<numPhysPages; i++)
-	    pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+        int numPhysPages = Machine.processor().getNumPhysPages();
+        pageTable = new TranslationEntry[numPhysPages];
+        //for (int i=0; i<numPhysPages; i++){
+        //  pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+        //}
+        files[0] = UserKernel.console.openForReading();
+        files[1] = UserKernel.console.openForWriting();
+        for(int i = 2; i<files.length; i++){
+            files[i] = null;
+        }
     }
     
     /**
@@ -388,16 +402,144 @@ public class UserProcess {
      * @return	the value to be returned to the user.
      */
     public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
-	switch (syscall) {
-	case syscallHalt:
-	    return handleHalt();
+        switch(syscall){
+            case syscallHalt:
+                return handleHalt(); //halt already given may need failsafes
+            case syscallCreate:
+                    return handleCreate(a0);
+            case syscallOpen:	
+                    return handleOpen(a0);
+            case syscallRead:
+                    return handleRead(a0, a1, a2);
+            case syscallWrite:
+                    return handleWrite(a0, a1, a2);
+            case syscallClose:
+                    return handleClose(a0);
+            case syscallUnlink:
+                    return handleUnlink(a0);
+            default:
+                Lib.debug(dbgProcess, "Unknown syscall " + syscall);
+                Lib.assertNotReached("Unknown system call!");
+        }
+        return 0;
+    }
 
+    private int handleCreate(int name){
+        if(name<0){ // Check for bad argument
+			return -1;
+		}
+		String fileName = readVirtualMemoryString(name,maxlength);
+		if(fileName == null){ //Check that what you have isn’t empty		
+            return -1;
+		}
+		OpenFile fileContent = ThreadedKernel.fileSystem.open(fileName,true);
+        if(fileContent == null){ //Check that what you have isn’t empty
+            return -1;
+        }
+        for(int i=2; i<files.length; i++){
+            if(files[i] == null){ //look for empty file space
+                files[i] = fileContent;
+                return i;
+            }
+        }
+        return -1;
+    }
 
-	default:
-	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
-	    Lib.assertNotReached("Unknown system call!");
-	}
-	return 0;
+    private int handleOpen(int name){
+      if (name<0){ 
+        return -1;
+      }
+      String fileName = readVirtualMemoryString(name,maxlength);
+      if (fileName == null){ 
+        return -1;
+      }
+      OpenFile fileContent = ThreadedKernel.fileSystem.open(fileName,false);
+      if (fileContent == null){ 
+        return -1;
+      }
+      for (int i=0; i<files.length; i++){
+          if (files[i] == null){ 
+            files[i] = fileContent;
+            return i; 
+          }
+      }
+      return -1; 
+    }
+
+    private int handleRead(int Descriptor, int buffer, int count){
+        if(Descriptor < 0 || Descriptor >= files.length){
+	        return -1;
+        }
+		if(files[Descriptor] == null){
+			return -1;
+		}
+        byte [] bte = new byte[count]; //create byte array of count length
+        int length = 0;
+        if(files[Descriptor]==null){//check if file exists
+            return -1;
+        }
+        length = files[Descriptor].read(bte,0,count);
+        if(length == -1){ //An error occurred while                                                     /                            //reading file
+            return -1;
+        }
+        writeVirtualMemory(buffer,bte);
+        return length;
+    }
+
+    private int handleWrite(int Descriptor, int virtualAddress, int count){
+        if(Descriptor < 0 || Descriptor >= files.length){
+	        return -1;
+        }
+		if(files[Descriptor] == null){
+			return -1;
+		}
+        byte[] bte = new byte[count];
+        if(Descriptor< 0 || Descriptor >= files.length) {
+            return -1;
+        }
+        String write = readVirtualMemory(virtualAddress, bte, 0 , count);
+        if(write == -1) {
+            return -1;
+        }
+        String content = files[Descriptor].write(bte, 0, count);
+        if (content == -1 || content < count) {
+			return -1;
+		}
+        return content;
+    }
+
+    private int handleClose(int Descriptor){
+        if(Descriptor < 0 || Descriptor >= files.length){
+	        return -1;
+        }
+		if(files[Descriptor] == null){
+			return -1;
+		}
+		files[Descriptor].close();
+		files[Descriptor] = null;
+		return 0;
+    }
+
+    private int handleUnlink(int name){
+        if(name<0){
+			return -1;
+		}
+		String fileName = readVirtualMemoryString(name,maxlength);
+		if(fileName == null){ //Check that what you have isn’t empty		
+            return -1;
+		}
+		int check = -1;
+		for(int i=2; i<files.length; i++){
+            if(files[i]!= null && files[i].getName().equals(name)){
+	            check = i;
+            }
+		}
+        if(check == -1){
+			return 0;
+		}
+		ThreadedKernel.fileSystem.remove(name);
+		handleClose(check);
+		return 0;
     }
 
     /**
@@ -435,6 +577,7 @@ public class UserProcess {
 
     /** This process's page table. */
     protected TranslationEntry[] pageTable;
+	protected OpenFile[] fileDescriptor;
     /** The number of contiguous pages occupied by the program. */
     protected int numPages;
 
